@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Khushi Commute Tracker</title>
 
-  <!-- ✅ PWA Manifest -->
+  <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1e88e5">
 
@@ -49,7 +49,7 @@
     .yellow { background: #fb8c00; color: white; }
     .dark { background: #334155; color: white; }
 
-    input {
+    input, select {
       width: 100%;
       padding: 10px;
       margin-top: 8px;
@@ -150,6 +150,7 @@
 
 <h1>🚗 Khushi Commute Tracker</h1>
 
+<!-- Calendar -->
 <div class="card">
   <div class="month-header">
     <button class="dark" onclick="changeMonth(-1)">⬅ Prev</button>
@@ -159,37 +160,70 @@
   <div id="calendar" class="calendar"></div>
 </div>
 
+<!-- Buttons -->
 <div class="card">
   <p id="selectedDayText"></p>
 
-  <button id="officeBtn" class="blue" onclick="logOfficeDay()">🟦 Office Day (WFO)</button>
-  <button id="wfhBtn" class="green" onclick="logWFH()">🏠 Work From Home (WFH)</button>
-  <button class="purple" onclick="openShootFlow()">➕ Add Shoot</button>
+  <button id="officeBtn" class="blue" onclick="logOfficeDay()">
+    🟦 Office Day (WFO)
+  </button>
+
+  <button id="wfhBtn" class="green" onclick="logWFH()">
+    🏠 Work From Home (WFH)
+  </button>
+
+  <button class="purple" onclick="openShootFlow()">
+    ➕ Add Shoot
+  </button>
 </div>
 
+<!-- Shoot Form -->
 <div class="card hidden" id="shootForm">
   <h3 id="shootTypeTitle"></h3>
+
+  <!-- Saved Locations Dropdown -->
+  <select id="savedLocations" onchange="applySavedLocation()">
+    <option value="">📌 Select Frequent Location</option>
+    <option value="Saya Zenith, Siddharth Vihar, Ghaziabad">
+      Saya Zenith (Ghaziabad)
+    </option>
+    <option value="Prateek Grand City, Siddharth Vihar, Ghaziabad">
+      Prateek Grand City
+    </option>
+    <option value="Gaur City Mall, Greater Noida West">
+      Gaur City Mall
+    </option>
+    <option value="Noida Sector 62 Metro Station">
+      Noida Sector 62 Metro
+    </option>
+  </select>
 
   <input id="locationInput" placeholder="📍 Shoot Location" />
   <input id="distanceInput" type="number" placeholder="One-way Distance (km)" />
 
-  <button class="yellow" onclick="autoFillDistance()">📍 Auto-Fill Distance</button>
-  <button class="purple" onclick="logShoot()">➕ Save Shoot Entry</button>
+  <!-- Google Maps Button -->
+  <button class="yellow" onclick="openGoogleMaps()">
+    📍 Open in Google Maps
+  </button>
+
+  <button class="purple" onclick="logShoot()">
+    ➕ Save Shoot Entry
+  </button>
 </div>
 
+<!-- Logs -->
 <div class="card">
   <h3>📅 Logs</h3>
   <div id="logList"></div>
 
-  <button class="yellow" onclick="exportWhatsApp()">📤 Export WhatsApp Report</button>
+  <button class="yellow" onclick="exportWhatsApp()">
+    📤 Export WhatsApp Report
+  </button>
+
   <textarea id="reportBox" class="hidden" readonly></textarea>
 </div>
 
 <script>
-/* FIXED COORDINATES */
-const HOME = { lat: 28.6001, lon: 77.3195 };
-const OFFICE = { lat: 28.6692, lon: 77.4538 };
-
 const OFFICE_DAY_TOTAL = 30;
 let selectedShootRoute = "";
 
@@ -265,6 +299,23 @@ function hideShootForm() {
   document.getElementById("shootForm").classList.add("hidden");
 }
 
+/* Apply saved dropdown */
+function applySavedLocation() {
+  let val = document.getElementById("savedLocations").value;
+  if (val) document.getElementById("locationInput").value = val;
+}
+
+/* Open Google Maps */
+function openGoogleMaps() {
+  let loc = document.getElementById("locationInput").value.trim();
+  if (!loc) return alert("Enter location first.");
+
+  let url =
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}`;
+
+  window.open(url, "_blank");
+}
+
 /* Logging */
 function logOfficeDay() {
   if (blockFuture()) return;
@@ -291,56 +342,15 @@ function logWFH() {
 function openShootFlow() {
   if (blockFuture()) return;
   let r = getDayRecord(selectedDay);
-  selectedShootRoute = r.office ? "Office>Shoot>Office" : "Home>Shoot>Home";
+
+  selectedShootRoute = r.office
+    ? "Office>Shoot>Office"
+    : "Home>Shoot>Home";
 
   document.getElementById("shootTypeTitle").innerText =
     `Log Shoot (${selectedShootRoute})`;
 
   document.getElementById("shootForm").classList.remove("hidden");
-}
-
-/* ✅ FIXED AUTO DISTANCE (Photon API) */
-async function autoFillDistance() {
-  let loc = document.getElementById("locationInput").value.trim();
-  if (!loc) return alert("Enter location first.");
-
-  let r = getDayRecord(selectedDay);
-  let start = r.office ? OFFICE : HOME;
-
-  // ✅ Photon Search (works on GitHub Pages)
-  let geoUrl =
-    `https://photon.komoot.io/api/?q=${encodeURIComponent(loc)}&limit=1`;
-
-  let geoRes = await fetch(geoUrl);
-  let geoData = await geoRes.json();
-
-  if (!geoData.features || geoData.features.length === 0) {
-    alert("Location not found. Try a more specific name.");
-    return;
-  }
-
-  let coords = geoData.features[0].geometry.coordinates;
-  let dest = { lon: coords[0], lat: coords[1] };
-
-  // OSRM Distance
-  let routeUrl =
-    `https://router.project-osrm.org/route/v1/driving/` +
-    `${start.lon},${start.lat};${dest.lon},${dest.lat}?overview=false`;
-
-  let routeRes = await fetch(routeUrl);
-  let routeData = await routeRes.json();
-
-  if (!routeData.routes || routeData.routes.length === 0) {
-    alert("Could not calculate distance.");
-    return;
-  }
-
-  let km = routeData.routes[0].distance / 1000;
-  km = Math.round(km);
-
-  document.getElementById("distanceInput").value = km;
-
-  alert("Auto-filled distance: " + km + " km (one-way)");
 }
 
 /* Save Shoot */
@@ -366,6 +376,7 @@ function logShoot() {
 
   document.getElementById("locationInput").value = "";
   document.getElementById("distanceInput").value = "";
+  document.getElementById("savedLocations").value = "";
 
   hideShootForm();
   renderAll();
