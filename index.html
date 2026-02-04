@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Khushi's Commute Tracker</title>
+  <title>Khushi Commute Tracker</title>
 
-  <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1e88e5">
 
@@ -119,25 +118,20 @@
       position: relative;
     }
 
-    /* ✅ PERFECT DELETE ICON CENTERING */
     .deleteBtn {
       position: absolute;
       right: 10px;
       top: 50%;
       transform: translateY(-50%);
-
       background: #ef4444;
       color: white;
       border: none;
-
       width: 30px;
       height: 30px;
       border-radius: 8px;
-
       display: flex;
       align-items: center;
       justify-content: center;
-
       font-size: 15px;
       line-height: 1;
       cursor: pointer;
@@ -157,7 +151,7 @@
 
 <body>
 
-<h1>🚗 Khushi's Commute Tracker</h1>
+<h1>🚗 Khushi Commute Tracker</h1>
 
 <!-- Calendar -->
 <div class="card">
@@ -181,11 +175,11 @@
     🏠 Work From Home (WFH)
   </button>
 
-  <button class="dark" onclick="logLeave()">
+  <button id="leaveBtn" class="dark" onclick="logLeave()">
     💤 Leave Day
   </button>
 
-  <button class="purple" onclick="openShootFlow()">
+  <button id="shootBtn" class="purple" onclick="openShootFlow()">
     ➕ Add Shoot
   </button>
 </div>
@@ -219,17 +213,6 @@
     📋 Copy Report (WhatsApp Ready)
   </button>
 
-  <button class="dark" onclick="backupData()">
-    💾 Backup My Data
-  </button>
-
-  <input type="file" id="restoreFile" class="hidden"
-         accept=".json" onchange="restoreData(event)" />
-
-  <button class="dark" onclick="triggerRestore()">
-    ♻️ Restore Backup
-  </button>
-
   <textarea id="reportBox" class="hidden" readonly></textarea>
 </div>
 
@@ -261,23 +244,13 @@ function parseDate(str) {
   return new Date(`${yyyy}-${mm}-${dd}`);
 }
 
-function getSuffix(day) {
-  if (day >= 11 && day <= 13) return "th";
-  switch (day % 10) {
-    case 1: return "st";
-    case 2: return "nd";
-    case 3: return "rd";
-    default: return "th";
-  }
-}
-
 function saveLogs() {
   localStorage.setItem("khushi_logs", JSON.stringify(logs));
 }
 
 function getDayRecord(day) {
   if (!logs[day]) {
-    logs[day] = { office:false, wfh:false, shoots:[], totalKm:0 };
+    logs[day] = { office:false, wfh:false, leave:false, shoots:[], totalKm:0 };
   }
   return logs[day];
 }
@@ -297,35 +270,40 @@ function blockFuture() {
   return false;
 }
 
+/* ✅ AUTO HIDE LOGIC INCLUDING LEAVE */
 function updateButtons(record) {
+
+  // If Leave Day → hide everything except Leave itself
+  if (record.leave) {
+    document.getElementById("officeBtn").style.display = "none";
+    document.getElementById("wfhBtn").style.display = "none";
+    document.getElementById("shootBtn").style.display = "none";
+    return;
+  }
+
+  // Normal logic
   document.getElementById("officeBtn").style.display =
     record.wfh ? "none" : "block";
 
   document.getElementById("wfhBtn").style.display =
     record.office ? "none" : "block";
+
+  document.getElementById("shootBtn").style.display = "block";
 }
 
 function hideShootForm() {
   document.getElementById("shootForm").classList.add("hidden");
 }
 
-/* Google Maps */
-function openGoogleMaps() {
-  let loc = document.getElementById("locationInput").value.trim();
-  if (!loc) return alert("Enter location first.");
-
-  let url =
-    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}`;
-
-  window.open(url, "_blank");
-}
-
-/* Main Logging */
+/* Logging */
 function logOfficeDay() {
   if (blockFuture()) return;
   let r = getDayRecord(selectedDay);
+
   r.office = true;
   r.wfh = false;
+  r.leave = false;
+
   recalc(r);
   saveLogs();
   renderAll();
@@ -334,9 +312,12 @@ function logOfficeDay() {
 function logWFH() {
   if (blockFuture()) return;
   let r = getDayRecord(selectedDay);
+
   r.wfh = true;
   r.office = false;
+  r.leave = false;
   r.shoots = [];
+
   recalc(r);
   saveLogs();
   renderAll();
@@ -346,19 +327,27 @@ function logLeave() {
   if (blockFuture()) return;
   let r = getDayRecord(selectedDay);
 
+  r.leave = true;
   r.office = false;
   r.wfh = false;
   r.shoots = [];
   r.totalKm = 0;
 
   saveLogs();
+  hideShootForm();
   renderAll();
 }
 
 /* Shoot */
 function openShootFlow() {
   if (blockFuture()) return;
+
   let r = getDayRecord(selectedDay);
+
+  if (r.leave) {
+    alert("Leave Day marked. No shoots allowed 😴");
+    return;
+  }
 
   selectedShootRoute = r.office
     ? "Office>Shoot>Office"
@@ -368,6 +357,16 @@ function openShootFlow() {
     `Log Shoot (${selectedShootRoute})`;
 
   document.getElementById("shootForm").classList.remove("hidden");
+}
+
+function openGoogleMaps() {
+  let loc = document.getElementById("locationInput").value.trim();
+  if (!loc) return alert("Enter location first.");
+
+  let url =
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}`;
+
+  window.open(url, "_blank");
 }
 
 function logShoot() {
@@ -387,6 +386,8 @@ function logShoot() {
     km: km
   });
 
+  r.leave = false;
+
   recalc(r);
   saveLogs();
 
@@ -397,40 +398,29 @@ function logShoot() {
   renderAll();
 }
 
-/* Delete */
-function deleteDay(date) {
-  if (!confirm("Delete this day's log?")) return;
-  delete logs[date];
-  saveLogs();
-  renderAll();
-}
-
-/* Export */
+/* Export + Copy */
 function exportWhatsApp() {
   let report = `✅ ${monthNames[viewMonth]} ${viewYear}\n\n`;
   let total = 0;
 
   Object.keys(logs)
-    .filter(date => {
-      let d = parseDate(date);
-      return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
-    })
     .sort((a,b)=>parseDate(a)-parseDate(b))
     .forEach(date => {
       let r = logs[date];
+      let d = parseDate(date);
+
+      if (d.getMonth() !== viewMonth || d.getFullYear() !== viewYear) return;
+
       total += r.totalKm;
 
-      let dayNum = parseInt(date.split("-")[0]);
-      let suffix = getSuffix(dayNum);
-
-      let tag = r.office ? "WFO" : r.wfh ? "WFH" : "LEAVE";
+      let tag = r.leave ? "LEAVE" : r.office ? "WFO" : r.wfh ? "WFH" : "";
 
       let details =
         r.shoots.length > 0
           ? r.shoots.map(s => s.route).join(", ")
           : "No Shoot";
 
-      report += `${dayNum}${suffix} – ${r.totalKm} km [${tag} (${details})]\n`;
+      report += `${date} – ${r.totalKm} km [${tag} (${details})]\n`;
     });
 
   report += `\n➡️ Total = ${total} km`;
@@ -440,68 +430,20 @@ function exportWhatsApp() {
   box.value = report;
 }
 
-/* Copy Report */
 function copyReport() {
   let box = document.getElementById("reportBox");
 
   if (box.classList.contains("hidden") || box.value.trim() === "") {
-    alert("Please export the report first.");
+    alert("Export first.");
     return;
   }
 
   navigator.clipboard.writeText(box.value)
-    .then(() => alert("Copied! Paste directly into WhatsApp ✅"))
-    .catch(() => alert("Copy failed. Please select manually."));
+    .then(() => alert("Copied! Paste into WhatsApp ✅"))
+    .catch(() => alert("Copy failed."));
 }
 
-/* Backup */
-function backupData() {
-  let dataStr = JSON.stringify(logs, null, 2);
-
-  let blob = new Blob([dataStr], { type: "application/json" });
-  let url = URL.createObjectURL(blob);
-
-  let a = document.createElement("a");
-  a.href = url;
-  a.download = "khushi_commute_backup.json";
-  a.click();
-
-  URL.revokeObjectURL(url);
-
-  alert("Backup downloaded ✅ Save it in Files/iCloud.");
-}
-
-/* Restore */
-function triggerRestore() {
-  document.getElementById("restoreFile").click();
-}
-
-function restoreData(event) {
-  let file = event.target.files[0];
-  if (!file) return;
-
-  let reader = new FileReader();
-
-  reader.onload = function(e) {
-    try {
-      let restored = JSON.parse(e.target.result);
-
-      if (!confirm("Restore backup? This will replace current data.")) return;
-
-      logs = restored;
-      saveLogs();
-      renderAll();
-
-      alert("Backup restored successfully ✅");
-    } catch {
-      alert("Invalid backup file ❌");
-    }
-  };
-
-  reader.readAsText(file);
-}
-
-/* Month Switch */
+/* Calendar + Logs Render */
 function changeMonth(step) {
   viewMonth += step;
   if (viewMonth < 0) { viewMonth = 11; viewYear--; }
@@ -509,7 +451,6 @@ function changeMonth(step) {
   renderAll();
 }
 
-/* Calendar */
 function renderCalendar() {
   document.getElementById("monthTitle").innerText =
     `${monthNames[viewMonth]} ${viewYear}`;
@@ -543,21 +484,19 @@ function renderCalendar() {
   }
 }
 
-/* Logs */
 function renderLogs() {
   let list = document.getElementById("logList");
   list.innerHTML = "";
 
   Object.keys(logs)
-    .filter(date => {
-      let d = parseDate(date);
-      return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
-    })
     .sort((a,b)=>parseDate(a)-parseDate(b))
     .forEach(date => {
       let r = logs[date];
+      let d = parseDate(date);
 
-      let tag = r.office ? "WFO" : r.wfh ? "WFH" : "LEAVE";
+      if (d.getMonth() !== viewMonth || d.getFullYear() !== viewYear) return;
+
+      let tag = r.leave ? "LEAVE" : r.office ? "WFO" : r.wfh ? "WFH" : "";
 
       let details =
         r.shoots.length > 0
@@ -566,31 +505,24 @@ function renderLogs() {
 
       list.innerHTML += `
         <div class="log-entry">
-          <button class="deleteBtn" onclick="deleteDay('${date}')">🗑</button>
 ${date} – ${r.totalKm} km
 ➡️ ${tag} (${details})
         </div>`;
     });
 }
 
-/* Render */
 function renderAll() {
   document.getElementById("selectedDayText").innerHTML =
     `Selected Day: <b>${selectedDay}</b>`;
 
   let r = getDayRecord(selectedDay);
-  updateButtons(r);
 
+  updateButtons(r);
   renderCalendar();
   renderLogs();
 }
 
 renderAll();
-
-/* Service Worker */
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js");
-}
 </script>
 
 </body>
