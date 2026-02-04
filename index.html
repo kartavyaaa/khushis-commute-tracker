@@ -49,7 +49,7 @@
     .yellow { background: #fb8c00; color: white; }
     .dark { background: #334155; color: white; }
 
-    input, select {
+    input {
       width: 100%;
       padding: 10px;
       margin-top: 8px;
@@ -172,6 +172,10 @@
     🏠 Work From Home (WFH)
   </button>
 
+  <button class="dark" onclick="logLeave()">
+    💤 Leave Day
+  </button>
+
   <button class="purple" onclick="openShootFlow()">
     ➕ Add Shoot
   </button>
@@ -180,23 +184,6 @@
 <!-- Shoot Form -->
 <div class="card hidden" id="shootForm">
   <h3 id="shootTypeTitle"></h3>
-
-  <!-- Saved Locations Dropdown -->
-  <select id="savedLocations" onchange="applySavedLocation()">
-    <option value="">📌 Select Frequent Location</option>
-    <option value="Saya Zenith, Siddharth Vihar, Ghaziabad">
-      Saya Zenith (Ghaziabad)
-    </option>
-    <option value="Prateek Grand City, Siddharth Vihar, Ghaziabad">
-      Prateek Grand City
-    </option>
-    <option value="Gaur City Mall, Greater Noida West">
-      Gaur City Mall
-    </option>
-    <option value="Noida Sector 62 Metro Station">
-      Noida Sector 62 Metro
-    </option>
-  </select>
 
   <input id="locationInput" placeholder="📍 Shoot Location" />
   <input id="distanceInput" type="number" placeholder="One-way Distance (km)" />
@@ -299,12 +286,6 @@ function hideShootForm() {
   document.getElementById("shootForm").classList.add("hidden");
 }
 
-/* Apply saved dropdown */
-function applySavedLocation() {
-  let val = document.getElementById("savedLocations").value;
-  if (val) document.getElementById("locationInput").value = val;
-}
-
 /* Open Google Maps */
 function openGoogleMaps() {
   let loc = document.getElementById("locationInput").value.trim();
@@ -334,6 +315,20 @@ function logWFH() {
   r.office = false;
   r.shoots = [];
   recalc(r);
+  saveLogs();
+  renderAll();
+}
+
+/* Leave Day */
+function logLeave() {
+  if (blockFuture()) return;
+  let r = getDayRecord(selectedDay);
+
+  r.office = false;
+  r.wfh = false;
+  r.shoots = [];
+  r.totalKm = 0;
+
   saveLogs();
   renderAll();
 }
@@ -376,7 +371,6 @@ function logShoot() {
 
   document.getElementById("locationInput").value = "";
   document.getElementById("distanceInput").value = "";
-  document.getElementById("savedLocations").value = "";
 
   hideShootForm();
   renderAll();
@@ -446,7 +440,8 @@ function renderLogs() {
     .forEach(date => {
       let r = logs[date];
 
-      let tag = r.wfh ? "WFH" : "WFO";
+      let tag = r.office ? "WFO" : r.wfh ? "WFH" : "LEAVE";
+
       let details =
         r.shoots.length > 0
           ? r.shoots.map(s => s.route).join(", ")
@@ -479,7 +474,8 @@ function exportWhatsApp() {
       let dayNum = parseInt(date.split("-")[0]);
       let suffix = getSuffix(dayNum);
 
-      let tag = r.wfh ? "WFH" : "WFO";
+      let tag = r.office ? "WFO" : r.wfh ? "WFH" : "LEAVE";
+
       let details =
         r.shoots.length > 0
           ? r.shoots.map(s => s.route).join(", ")
