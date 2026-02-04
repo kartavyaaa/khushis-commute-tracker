@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Khushi Commute Tracker</title>
+  <title>Khushi's Commute Tracker</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
@@ -110,7 +110,7 @@
     .log-entry {
       border: 1px solid #ddd;
       padding: 10px;
-      padding-right: 45px;
+      padding-right: 50px;
       border-radius: 10px;
       margin-top: 8px;
       background: #f1f5f9;
@@ -119,18 +119,27 @@
       position: relative;
     }
 
+    /* ✅ PERFECT DELETE ICON CENTERING */
     .deleteBtn {
       position: absolute;
       right: 10px;
       top: 50%;
       transform: translateY(-50%);
+
       background: #ef4444;
       color: white;
       border: none;
-      width: 28px;
-      height: 28px;
+
+      width: 30px;
+      height: 30px;
       border-radius: 8px;
-      font-size: 14px;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      font-size: 15px;
+      line-height: 1;
       cursor: pointer;
     }
 
@@ -148,7 +157,7 @@
 
 <body>
 
-<h1>🚗 Khushi Commute Tracker</h1>
+<h1>🚗 Khushi's Commute Tracker</h1>
 
 <!-- Calendar -->
 <div class="card">
@@ -188,7 +197,6 @@
   <input id="locationInput" placeholder="📍 Shoot Location" />
   <input id="distanceInput" type="number" placeholder="One-way Distance (km)" />
 
-  <!-- Google Maps Button -->
   <button class="yellow" onclick="openGoogleMaps()">
     📍 Open in Google Maps
   </button>
@@ -205,6 +213,21 @@
 
   <button class="yellow" onclick="exportWhatsApp()">
     📤 Export WhatsApp Report
+  </button>
+
+  <button class="green" onclick="copyReport()">
+    📋 Copy Report (WhatsApp Ready)
+  </button>
+
+  <button class="dark" onclick="backupData()">
+    💾 Backup My Data
+  </button>
+
+  <input type="file" id="restoreFile" class="hidden"
+         accept=".json" onchange="restoreData(event)" />
+
+  <button class="dark" onclick="triggerRestore()">
+    ♻️ Restore Backup
   </button>
 
   <textarea id="reportBox" class="hidden" readonly></textarea>
@@ -286,7 +309,7 @@ function hideShootForm() {
   document.getElementById("shootForm").classList.add("hidden");
 }
 
-/* Open Google Maps */
+/* Google Maps */
 function openGoogleMaps() {
   let loc = document.getElementById("locationInput").value.trim();
   if (!loc) return alert("Enter location first.");
@@ -297,7 +320,7 @@ function openGoogleMaps() {
   window.open(url, "_blank");
 }
 
-/* Logging */
+/* Main Logging */
 function logOfficeDay() {
   if (blockFuture()) return;
   let r = getDayRecord(selectedDay);
@@ -319,7 +342,6 @@ function logWFH() {
   renderAll();
 }
 
-/* Leave Day */
 function logLeave() {
   if (blockFuture()) return;
   let r = getDayRecord(selectedDay);
@@ -348,7 +370,6 @@ function openShootFlow() {
   document.getElementById("shootForm").classList.remove("hidden");
 }
 
-/* Save Shoot */
 function logShoot() {
   if (blockFuture()) return;
 
@@ -382,6 +403,102 @@ function deleteDay(date) {
   delete logs[date];
   saveLogs();
   renderAll();
+}
+
+/* Export */
+function exportWhatsApp() {
+  let report = `✅ ${monthNames[viewMonth]} ${viewYear}\n\n`;
+  let total = 0;
+
+  Object.keys(logs)
+    .filter(date => {
+      let d = parseDate(date);
+      return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
+    })
+    .sort((a,b)=>parseDate(a)-parseDate(b))
+    .forEach(date => {
+      let r = logs[date];
+      total += r.totalKm;
+
+      let dayNum = parseInt(date.split("-")[0]);
+      let suffix = getSuffix(dayNum);
+
+      let tag = r.office ? "WFO" : r.wfh ? "WFH" : "LEAVE";
+
+      let details =
+        r.shoots.length > 0
+          ? r.shoots.map(s => s.route).join(", ")
+          : "No Shoot";
+
+      report += `${dayNum}${suffix} – ${r.totalKm} km [${tag} (${details})]\n`;
+    });
+
+  report += `\n➡️ Total = ${total} km`;
+
+  let box = document.getElementById("reportBox");
+  box.classList.remove("hidden");
+  box.value = report;
+}
+
+/* Copy Report */
+function copyReport() {
+  let box = document.getElementById("reportBox");
+
+  if (box.classList.contains("hidden") || box.value.trim() === "") {
+    alert("Please export the report first.");
+    return;
+  }
+
+  navigator.clipboard.writeText(box.value)
+    .then(() => alert("Copied! Paste directly into WhatsApp ✅"))
+    .catch(() => alert("Copy failed. Please select manually."));
+}
+
+/* Backup */
+function backupData() {
+  let dataStr = JSON.stringify(logs, null, 2);
+
+  let blob = new Blob([dataStr], { type: "application/json" });
+  let url = URL.createObjectURL(blob);
+
+  let a = document.createElement("a");
+  a.href = url;
+  a.download = "khushi_commute_backup.json";
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+  alert("Backup downloaded ✅ Save it in Files/iCloud.");
+}
+
+/* Restore */
+function triggerRestore() {
+  document.getElementById("restoreFile").click();
+}
+
+function restoreData(event) {
+  let file = event.target.files[0];
+  if (!file) return;
+
+  let reader = new FileReader();
+
+  reader.onload = function(e) {
+    try {
+      let restored = JSON.parse(e.target.result);
+
+      if (!confirm("Restore backup? This will replace current data.")) return;
+
+      logs = restored;
+      saveLogs();
+      renderAll();
+
+      alert("Backup restored successfully ✅");
+    } catch {
+      alert("Invalid backup file ❌");
+    }
+  };
+
+  reader.readAsText(file);
 }
 
 /* Month Switch */
@@ -454,42 +571,6 @@ ${date} – ${r.totalKm} km
 ➡️ ${tag} (${details})
         </div>`;
     });
-}
-
-/* Export */
-function exportWhatsApp() {
-  let report = `✅ ${monthNames[viewMonth]} ${viewYear}\n\n`;
-  let total = 0;
-
-  Object.keys(logs)
-    .filter(date => {
-      let d = parseDate(date);
-      return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
-    })
-    .sort((a,b)=>parseDate(a)-parseDate(b))
-    .forEach(date => {
-      let r = logs[date];
-      total += r.totalKm;
-
-      let dayNum = parseInt(date.split("-")[0]);
-      let suffix = getSuffix(dayNum);
-
-      let tag = r.office ? "WFO" : r.wfh ? "WFH" : "LEAVE";
-
-      let details =
-        r.shoots.length > 0
-          ? r.shoots.map(s => s.route).join(", ")
-          : "No Shoot";
-
-      report += `${dayNum}${suffix} – ${r.totalKm} km [${tag} (${details})]\n`;
-    });
-
-  report += `\n➡️ Total = ${total} km`;
-
-  let box = document.getElementById("reportBox");
-  box.classList.remove("hidden");
-  box.value = report;
-  box.select();
 }
 
 /* Render */
