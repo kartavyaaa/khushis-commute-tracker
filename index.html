@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Khushi Commute Tracker</title>
+
+  <!-- ✅ PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1e88e5">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #dbeafe;
+      margin: 0;
+      padding: 12px;
+      color: #222;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 8px;
+      font-size: 20px;
+    }
+
+    .card {
+      background: #fffdf5;
+      padding: 14px;
+      border-radius: 14px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    button {
+      padding: 10px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .blue { background: #1e88e5; color: white; }
+    .green { background: #43a047; color: white; }
+    .purple { background: #8e24aa; color: white; }
+    .yellow { background: #fb8c00; color: white; }
+    .dark { background: #334155; color: white; }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 8px;
+      border-radius: 10px;
+      border: 1px solid #bbb;
+      font-size: 14px;
+    }
+
+    .hidden { display: none; }
+
+    /* Month Header */
+    .month-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .month-header button {
+      width: auto;
+      padding: 6px 10px;
+      font-size: 13px;
+      margin: 0;
+      border-radius: 10px;
+    }
+
+    /* Calendar */
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .day {
+      background: #e0f2fe;
+      padding: 8px;
+      border-radius: 10px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .day.logged {
+      background: #bbf7d0;
+      font-weight: bold;
+    }
+
+    .day.future {
+      background: #d1d5db;
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .selected {
+      border: 2px solid #222;
+    }
+
+    /* Logs */
+    .log-entry {
+      border: 1px solid #ddd;
+      padding: 10px;
+      padding-right: 45px;
+      border-radius: 10px;
+      margin-top: 8px;
+      background: #f1f5f9;
+      font-size: 13px;
+      white-space: pre-line;
+      position: relative;
+    }
+
+    /* Delete Button */
+    .deleteBtn {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #ef4444;
+      color: white;
+      border: none;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    textarea {
+      width: 100%;
+      height: 180px;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #bbb;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>🚗 Khushi Commute Tracker</h1>
+
+<!-- Calendar -->
+<div class="card">
+  <div class="month-header">
+    <button class="dark" onclick="changeMonth(-1)">⬅ Prev</button>
+    <span id="monthTitle"></span>
+    <button class="dark" onclick="changeMonth(1)">Next ➡</button>
+  </div>
+
+  <div id="calendar" class="calendar"></div>
+</div>
+
+<!-- Main Buttons -->
+<div class="card">
+  <p id="selectedDayText"></p>
+
+  <button id="officeBtn" class="blue" onclick="logOfficeDay()">🟦 Office Day (WFO)</button>
+  <button id="wfhBtn" class="green" onclick="logWFH()">🏠 Work From Home (WFH)</button>
+  <button class="purple" onclick="openShootFlow()">➕ Add Shoot</button>
+</div>
+
+<!-- Shoot Form -->
+<div class="card hidden" id="shootForm">
+  <h3 id="shootTypeTitle"></h3>
+
+  <input id="locationInput" placeholder="📍 Shoot Location" />
+  <input id="distanceInput" type="number" placeholder="One-way Distance (km)" />
+
+  <button class="yellow" onclick="autoFillDistance()">
+    📍 Auto-Fill Distance
+  </button>
+
+  <button class="purple" onclick="logShoot()">
+    ➕ Save Shoot Entry
+  </button>
+</div>
+
+<!-- Logs -->
+<div class="card">
+  <h3>📅 Logs</h3>
+  <div id="logList"></div>
+
+  <button class="yellow" onclick="exportWhatsApp()">
+    📤 Export WhatsApp Report
+  </button>
+
+  <textarea id="reportBox" class="hidden" readonly></textarea>
+</div>
+
+<script>
+/* ===============================
+   FIXED HOME + OFFICE COORDINATES
+   =============================== */
+
+const HOME = { lat: 28.6001, lon: 77.3195 };   // Vasundhara Enclave
+const OFFICE = { lat: 28.6692, lon: 77.4538 }; // Siddharth Vihar
+
+/* =============================== */
+
+const OFFICE_DAY_TOTAL = 30;
+let selectedShootRoute = "";
+
+let logs = JSON.parse(localStorage.getItem("khushi_logs")) || {};
+
+const today = new Date();
+
+let viewYear = today.getFullYear();
+let viewMonth = today.getMonth();
+
+let selectedDay = formatDate(today);
+
+const monthNames = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December"
+];
+
+/* Helpers */
+function formatDate(dateObj) {
+  let dd = String(dateObj.getDate()).padStart(2, "0");
+  let mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+  let yyyy = dateObj.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
+
+function parseDate(str) {
+  let [dd, mm, yyyy] = str.split("-");
+  return new Date(`${yyyy}-${mm}-${dd}`);
+}
+
+function getSuffix(day) {
+  if (day >= 11 && day <= 13) return "th";
+  switch (day % 10) {
+    case 1: return "st";
+    case 2: return "nd";
+    case 3: return "rd";
+    default: return "th";
+  }
+}
+
+function saveLogs() {
+  localStorage.setItem("khushi_logs", JSON.stringify(logs));
+}
+
+function getDayRecord(day) {
+  if (!logs[day]) {
+    logs[day] = { office:false, wfh:false, shoots:[], totalKm:0 };
+  }
+  return logs[day];
+}
+
+function recalc(record) {
+  let km = 0;
+  if (record.office) km += OFFICE_DAY_TOTAL;
+  record.shoots.forEach(s => km += s.km);
+  record.totalKm = km;
+}
+
+function blockFuture() {
+  if (parseDate(selectedDay) > today) {
+    alert("Future entries are not allowed.");
+    return true;
+  }
+  return false;
+}
+
+function updateButtons(record) {
+  document.getElementById("officeBtn").style.display =
+    record.wfh ? "none" : "block";
+
+  document.getElementById("wfhBtn").style.display =
+    record.office ? "none" : "block";
+}
+
+function hideShootForm() {
+  document.getElementById("shootForm").classList.add("hidden");
+}
+
+/* Logging */
+function logOfficeDay() {
+  if (blockFuture()) return;
+
+  let r = getDayRecord(selectedDay);
+  r.office = true;
+  r.wfh = false;
+  recalc(r);
+
+  saveLogs();
+  renderAll();
+}
+
+function logWFH() {
+  if (blockFuture()) return;
+
+  let r = getDayRecord(selectedDay);
+  r.wfh = true;
+  r.office = false;
+  r.shoots = [];
+  recalc(r);
+
+  saveLogs();
+  renderAll();
+}
+
+/* Shoot Flow */
+function openShootFlow() {
+  if (blockFuture()) return;
+
+  let r = getDayRecord(selectedDay);
+  selectedShootRoute = r.office ? "Office>Shoot>Office" : "Home>Shoot>Home";
+
+  document.getElementById("shootTypeTitle").innerText =
+    `Log Shoot (${selectedShootRoute})`;
+
+  document.getElementById("shootForm").classList.remove("hidden");
+}
+
+/* Auto Distance Fill */
+async function autoFillDistance() {
+  let loc = document.getElementById("locationInput").value.trim();
+  if (!loc) return alert("Enter location first.");
+
+  let r = getDayRecord(selectedDay);
+  let start = r.office ? OFFICE : HOME;
+
+  // Geocode location (OpenStreetMap)
+  let geoUrl =
+    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(loc)}`;
+
+  let geoRes = await fetch(geoUrl);
+  let geoData = await geoRes.json();
+
+  if (geoData.length === 0) {
+    alert("Location not found. Try a more specific name.");
+    return;
+  }
+
+  let dest = {
+    lat: parseFloat(geoData[0].lat),
+    lon: parseFloat(geoData[0].lon)
+  };
+
+  // OSRM Route distance
+  let routeUrl =
+    `https://router.project-osrm.org/route/v1/driving/` +
+    `${start.lon},${start.lat};${dest.lon},${dest.lat}?overview=false`;
+
+  let routeRes = await fetch(routeUrl);
+  let routeData = await routeRes.json();
+
+  if (!routeData.routes || routeData.routes.length === 0) {
+    alert("Could not calculate distance.");
+    return;
+  }
+
+  let km = routeData.routes[0].distance / 1000;
+  km = Math.round(km);
+
+  document.getElementById("distanceInput").value = km;
+
+  alert("Auto-filled distance: " + km + " km (one-way)");
+}
+
+/* Save Shoot */
+function logShoot() {
+  if (blockFuture()) return;
+
+  let loc = document.getElementById("locationInput").value.trim();
+  let dist = parseFloat(document.getElementById("distanceInput").value);
+
+  if (!loc || !dist) return alert("Enter location + distance");
+
+  let r = getDayRecord(selectedDay);
+
+  let km = Math.round(dist) * 2;
+
+  r.shoots.push({
+    route: selectedShootRoute.replace("Shoot", `Shoot @ ${loc}`),
+    km: km
+  });
+
+  recalc(r);
+  saveLogs();
+
+  document.getElementById("locationInput").value = "";
+  document.getElementById("distanceInput").value = "";
+
+  hideShootForm();
+  renderAll();
+}
+
+/* Delete Day */
+function deleteDay(date) {
+  if (!confirm("Delete this day's log?")) return;
+  delete logs[date];
+  saveLogs();
+  renderAll();
+}
+
+/* Month Switching */
+function changeMonth(step) {
+  viewMonth += step;
+
+  if (viewMonth < 0) {
+    viewMonth = 11;
+    viewYear--;
+  }
+  if (viewMonth > 11) {
+    viewMonth = 0;
+    viewYear++;
+  }
+
+  renderAll();
+}
+
+/* Calendar */
+function renderCalendar() {
+  document.getElementById("monthTitle").innerText =
+    `${monthNames[viewMonth]} ${viewYear}`;
+
+  let cal = document.getElementById("calendar");
+  cal.innerHTML = "";
+
+  let daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    let dateObj = new Date(viewYear, viewMonth, d);
+    let formatted = formatDate(dateObj);
+
+    let div = document.createElement("div");
+    div.className = "day";
+
+    if (logs[formatted]) div.classList.add("logged");
+    if (formatted === selectedDay) div.classList.add("selected");
+
+    if (dateObj > today) div.classList.add("future");
+
+    div.innerText = d;
+
+    div.onclick = () => {
+      if (dateObj > today) return;
+      selectedDay = formatted;
+      hideShootForm();
+      renderAll();
+    };
+
+    cal.appendChild(div);
+  }
+}
+
+/* Logs */
+function renderLogs() {
+  let list = document.getElementById("logList");
+  list.innerHTML = "";
+
+  Object.keys(logs)
+    .filter(date => {
+      let d = parseDate(date);
+      return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
+    })
+    .sort((a,b)=>parseDate(a)-parseDate(b))
+    .forEach(date => {
+      let r = logs[date];
+
+      let tag = r.wfh ? "WFH" : "WFO";
+      let details =
+        r.shoots.length > 0
+          ? r.shoots.map(s => s.route).join(", ")
+          : "No Shoot";
+
+      list.innerHTML += `
+        <div class="log-entry">
+          <button class="deleteBtn" onclick="deleteDay('${date}')">🗑</button>
+${date} – ${r.totalKm} km
+➡️ ${tag} (${details})
+        </div>`;
+    });
+}
+
+/* Export */
+function exportWhatsApp() {
+  let report = `✅ ${monthNames[viewMonth]} ${viewYear}\n\n`;
+  let total = 0;
+
+  Object.keys(logs)
+    .filter(date => {
+      let d = parseDate(date);
+      return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
+    })
+    .sort((a,b)=>parseDate(a)-parseDate(b))
+    .forEach(date => {
+      let r = logs[date];
+      total += r.totalKm;
+
+      let dayNum = parseInt(date.split("-")[0]);
+      let suffix = getSuffix(dayNum);
+
+      let tag = r.wfh ? "WFH" : "WFO";
+      let details =
+        r.shoots.length > 0
+          ? r.shoots.map(s => s.route).join(", ")
+          : "No Shoot";
+
+      report += `${dayNum}${suffix} – ${r.totalKm} km [${tag} (${details})]\n`;
+    });
+
+  report += `\n➡️ Total = ${total} km`;
+
+  let box = document.getElementById("reportBox");
+  box.classList.remove("hidden");
+  box.value = report;
+  box.select();
+}
+
+/* Render All */
+function renderAll() {
+  document.getElementById("selectedDayText").innerHTML =
+    `Selected Day: <b>${selectedDay}</b>`;
+
+  let r = getDayRecord(selectedDay);
+  updateButtons(r);
+
+  renderCalendar();
+  renderLogs();
+}
+
+renderAll();
+
+/* ✅ Service Worker Registration */
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./service-worker.js");
+}
+</script>
+
+</body>
+</html>
