@@ -109,7 +109,7 @@
     .log-entry {
       border: 1px solid #ddd;
       padding: 10px;
-      padding-right: 50px;
+      padding-right: 55px;
       border-radius: 10px;
       margin-top: 8px;
       background: #f1f5f9;
@@ -118,6 +118,7 @@
       position: relative;
     }
 
+    /* ✅ PERFECT TRASH BUTTON CENTER */
     .deleteBtn {
       position: absolute;
       right: 10px;
@@ -213,6 +214,17 @@
     📋 Copy Report (WhatsApp Ready)
   </button>
 
+  <button class="dark" onclick="backupData()">
+    💾 Backup My Data
+  </button>
+
+  <input type="file" id="restoreFile" class="hidden"
+         accept=".json" onchange="restoreData(event)" />
+
+  <button class="dark" onclick="triggerRestore()">
+    ♻️ Restore Backup
+  </button>
+
   <textarea id="reportBox" class="hidden" readonly></textarea>
 </div>
 
@@ -250,7 +262,13 @@ function saveLogs() {
 
 function getDayRecord(day) {
   if (!logs[day]) {
-    logs[day] = { office:false, wfh:false, leave:false, shoots:[], totalKm:0 };
+    logs[day] = {
+      office:false,
+      wfh:false,
+      leave:false,
+      shoots:[],
+      totalKm:0
+    };
   }
   return logs[day];
 }
@@ -270,25 +288,19 @@ function blockFuture() {
   return false;
 }
 
-/* ✅ AUTO HIDE LOGIC INCLUDING LEAVE */
+/* ✅ AUTO-HIDE INCLUDING LEAVE */
 function updateButtons(record) {
 
-  // If Leave Day → hide everything except Leave itself
   if (record.leave) {
-    document.getElementById("officeBtn").style.display = "none";
-    document.getElementById("wfhBtn").style.display = "none";
-    document.getElementById("shootBtn").style.display = "none";
+    officeBtn.style.display = "none";
+    wfhBtn.style.display = "none";
+    shootBtn.style.display = "none";
     return;
   }
 
-  // Normal logic
-  document.getElementById("officeBtn").style.display =
-    record.wfh ? "none" : "block";
-
-  document.getElementById("wfhBtn").style.display =
-    record.office ? "none" : "block";
-
-  document.getElementById("shootBtn").style.display = "block";
+  officeBtn.style.display = record.wfh ? "none" : "block";
+  wfhBtn.style.display = record.office ? "none" : "block";
+  shootBtn.style.display = "block";
 }
 
 function hideShootForm() {
@@ -345,7 +357,7 @@ function openShootFlow() {
   let r = getDayRecord(selectedDay);
 
   if (r.leave) {
-    alert("Leave Day marked. No shoots allowed 😴");
+    alert("Leave Day marked 😴 No shoots allowed.");
     return;
   }
 
@@ -398,7 +410,15 @@ function logShoot() {
   renderAll();
 }
 
-/* Export + Copy */
+/* Delete */
+function deleteDay(date) {
+  if (!confirm("Delete this day's log?")) return;
+  delete logs[date];
+  saveLogs();
+  renderAll();
+}
+
+/* Export */
 function exportWhatsApp() {
   let report = `✅ ${monthNames[viewMonth]} ${viewYear}\n\n`;
   let total = 0;
@@ -430,6 +450,7 @@ function exportWhatsApp() {
   box.value = report;
 }
 
+/* Copy */
 function copyReport() {
   let box = document.getElementById("reportBox");
 
@@ -443,7 +464,54 @@ function copyReport() {
     .catch(() => alert("Copy failed."));
 }
 
-/* Calendar + Logs Render */
+/* Backup */
+function backupData() {
+  let dataStr = JSON.stringify(logs, null, 2);
+
+  let blob = new Blob([dataStr], { type: "application/json" });
+  let url = URL.createObjectURL(blob);
+
+  let a = document.createElement("a");
+  a.href = url;
+  a.download = "khushi_commute_backup.json";
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+  alert("Backup downloaded ✅ Save it in Files/iCloud.");
+}
+
+/* Restore */
+function triggerRestore() {
+  document.getElementById("restoreFile").click();
+}
+
+function restoreData(event) {
+  let file = event.target.files[0];
+  if (!file) return;
+
+  let reader = new FileReader();
+
+  reader.onload = function(e) {
+    try {
+      let restored = JSON.parse(e.target.result);
+
+      if (!confirm("Restore backup? This will replace current data.")) return;
+
+      logs = restored;
+      saveLogs();
+      renderAll();
+
+      alert("Backup restored successfully ✅");
+    } catch {
+      alert("Invalid backup file ❌");
+    }
+  };
+
+  reader.readAsText(file);
+}
+
+/* Month Switch */
 function changeMonth(step) {
   viewMonth += step;
   if (viewMonth < 0) { viewMonth = 11; viewYear--; }
@@ -451,6 +519,7 @@ function changeMonth(step) {
   renderAll();
 }
 
+/* Calendar */
 function renderCalendar() {
   document.getElementById("monthTitle").innerText =
     `${monthNames[viewMonth]} ${viewYear}`;
@@ -484,6 +553,7 @@ function renderCalendar() {
   }
 }
 
+/* Logs */
 function renderLogs() {
   let list = document.getElementById("logList");
   list.innerHTML = "";
@@ -505,12 +575,14 @@ function renderLogs() {
 
       list.innerHTML += `
         <div class="log-entry">
+          <button class="deleteBtn" onclick="deleteDay('${date}')">🗑</button>
 ${date} – ${r.totalKm} km
 ➡️ ${tag} (${details})
         </div>`;
     });
 }
 
+/* Render */
 function renderAll() {
   document.getElementById("selectedDayText").innerHTML =
     `Selected Day: <b>${selectedDay}</b>`;
