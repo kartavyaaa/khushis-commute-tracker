@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Office Commute Tracker</title>
+  <title>Khushi Commute Tracker</title>
 
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1e88e5">
@@ -75,11 +75,30 @@
       border-radius: 10px;
     }
 
+    /* ✅ Weekday Header Row */
+    .weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+      color: #334155;
+    }
+
+    .weekday {
+      padding: 6px 0;
+      background: #bfdbfe;
+      border-radius: 8px;
+    }
+
+    /* Calendar Grid */
     .calendar {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
       gap: 6px;
-      margin-top: 8px;
+      margin-top: 4px;
     }
 
     .day {
@@ -118,7 +137,7 @@
       position: relative;
     }
 
-    /* ✅ PERFECT TRASH BUTTON CENTER */
+    /* ✅ Perfect Trash Center */
     .deleteBtn {
       position: absolute;
       right: 10px;
@@ -152,7 +171,7 @@
 
 <body>
 
-<h1>🚗 Khushi's Office Commute Tracker</h1>
+<h1>🚗 Khushi Commute Tracker</h1>
 
 <!-- Calendar -->
 <div class="card">
@@ -161,6 +180,19 @@
     <span id="monthTitle"></span>
     <button class="dark" onclick="changeMonth(1)">Next ➡</button>
   </div>
+
+  <!-- ✅ Weekday Names -->
+  <div class="weekdays">
+    <div class="weekday">Sun</div>
+    <div class="weekday">Mon</div>
+    <div class="weekday">Tue</div>
+    <div class="weekday">Wed</div>
+    <div class="weekday">Thu</div>
+    <div class="weekday">Fri</div>
+    <div class="weekday">Sat</div>
+  </div>
+
+  <!-- Calendar Dates -->
   <div id="calendar" class="calendar"></div>
 </div>
 
@@ -288,7 +320,7 @@ function blockFuture() {
   return false;
 }
 
-/* ✅ AUTO-HIDE INCLUDING LEAVE */
+/* Auto-Hide Buttons */
 function updateButtons(record) {
 
   if (record.leave) {
@@ -529,6 +561,15 @@ function renderCalendar() {
 
   let daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
 
+  /* ✅ Blank slots before Day 1 */
+  let firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  for (let i = 0; i < firstDay; i++) {
+    let blank = document.createElement("div");
+    blank.className = "day";
+    blank.style.visibility = "hidden";
+    cal.appendChild(blank);
+  }
+
   for (let d = 1; d <= daysInMonth; d++) {
     let dateObj = new Date(viewYear, viewMonth, d);
     let formatted = formatDate(dateObj);
@@ -599,4 +640,3 @@ renderAll();
 
 </body>
 </html>
-
